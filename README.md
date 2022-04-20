@@ -8,7 +8,7 @@ Clone the project and open it in Android Studio. Depending on your IDE and Groov
 
 ## Feedback
 
-Let us through issue system if there's anything you'd like us to improve! 
+Let us know through issue system if there's anything you'd like us to improve! 
 
 ## License
 
