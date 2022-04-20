@@ -1,10 +1,10 @@
 # Android Quuppa Tag Demo
 
-This is an Android Quuppa tag emulation sample app. It's primary purpose is to demonstrate the usage of [Quuppa Tag emulation library for Android](https://github.com/quuppalabs/android-quuppa-taglib).
+This is a Quuppa tag emulation sample app for Android. It's primary purpose is to demonstrate the usage of the [Quuppa Tag emulation library for Android](https://github.com/quuppalabs/android-quuppa-taglib).
 
-## Getting started
+## Getting Started
 
-Clone the project and open it in Android studio. Depending on your IDE and groovy version, you may need to adjust gradle-wrapper.properties. We use old gradle and gradle android tools for maximum compatibility.
+Clone the project and open it in Android Studio. Depending on your IDE and Groovy version, you may need to adjust the gradle-wrapper.properties. We use old Gradle and Gradle Android tools for maximum compatibility.
 
 ## License
 
