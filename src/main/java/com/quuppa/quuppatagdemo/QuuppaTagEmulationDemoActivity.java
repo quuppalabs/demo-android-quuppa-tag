@@ -201,18 +201,6 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         });
     }
 
-    /** Creates a byte array with the given tag ID */
-    private byte[] createQuuppaAddress(String tagID) {
-        byte[] bytes = new byte[6];
-        bytes[0] = (byte) Integer.parseInt(tagID.substring(0, 2), 16);
-        bytes[1] = (byte) Integer.parseInt(tagID.substring(2, 4), 16);
-        bytes[2] = (byte) Integer.parseInt(tagID.substring(4, 6), 16);
-        bytes[3] = (byte) Integer.parseInt(tagID.substring(6, 8), 16);
-        bytes[4] = (byte) Integer.parseInt(tagID.substring(8, 10), 16);
-        bytes[5] = (byte) Integer.parseInt(tagID.substring(10, 12), 16);
-        return bytes;
-    }
-
     private String getTagId() {
         SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
         String tagId = settings.getString(PREFS_MANUAL_TAG_ID, null);
