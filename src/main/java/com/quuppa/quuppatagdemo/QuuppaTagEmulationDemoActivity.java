@@ -230,13 +230,14 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 Toast.makeText(QuuppaTagEmulationDemoActivity.this, "Tag ID not set, please enter it in the settings!", Toast.LENGTH_LONG).show();
                 return;
             }
+            QuuppaTag.DEVICE_ID = tagID;
             /**
              * Advertise mode and tx power are fixed to LOW_LATENCY and HIGH power. Adjusting these settings affect the positioning quality and should only be changed with consideration
              */
             int mode = settings.getInt(ADV_MODE, AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
             int tx = settings.getInt(ADV_TX_POWER, AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
             try {
-                QuuppaTag.startAdvertising(this, dfPacketAdvCallback, tagID, mode, tx);
+                QuuppaTag.startAdvertising(this, dfPacketAdvCallback, true, mode, tx);
                 dfPacketAdvRunning = true;
             } catch (QuuppaTagException e) {
                 final String message = "Starting Bluetooth advertising failed. " + e.getMessage();
