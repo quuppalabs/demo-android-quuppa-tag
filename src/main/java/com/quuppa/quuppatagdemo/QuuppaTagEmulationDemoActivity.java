@@ -12,15 +12,14 @@ package com.quuppa.quuppatagdemo;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.AdvertiseCallback;
-import android.bluetooth.le.AdvertiseData;
-import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.content.Context;
 import android.content.DialogInterface;
-import android.content.SharedPreferences;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -30,84 +29,60 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 import com.quuppa.tag.QuuppaTag;
+import com.quuppa.tag.QuuppaTagService;
 import com.quuppa.tag.QuuppaTagException;
-
 
 import java.util.Arrays;
 
-
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
-    /** For logging */
-    private static final String TAG = "QuuppaTagEmulDemoActiv";
-    /** Name of the stored preferences */
-    public static final String PREFS_NAME = "MyPrefsFile";
-    /** Name of the stored manual tag id */
-    public static final String PREFS_MANUAL_TAG_ID = "tagID";
     /** name of the stored advertizing mode pref */
     public static final String ADV_MODE = "advMode";
     /** name of the stored advertizing tx power pref */
     public static final String ADV_TX_POWER = "advTxPower";
     /** Display names of the Adventizing Modes */
-    private final String[] advModes = new String[]{"ADVERTISE_MODE_LOW_POWER", "ADVERTISE_MODE_BALANCED", "ADVERTISE_MODE_LOW_LATENCY"};
-    /** Display names of the various TX power settings */
-    private final String[] advTxPowers = new String[]{"ADVERTISE_TX_POWER_ULTRA_LOW", "ADVERTISE_TX_POWER_LOW", "ADVERTISE_TX_POWER_MEDIUM", "ADVERTISE_TX_POWER_HIGH"};
 
-    /** reference to the #BluetoothLeAdvertiser */
-    private BluetoothLeAdvertiser bluetoothLeAdvertiser;
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
-    /** flag indicating whether Direction Packet advertising has been started */
-    private boolean dfPacketAdvRunning;
-
-    /**
-     * Callback used for Direction Finding Packet advertisements.
-     */
-    private AdvertiseCallback dfPacketAdvCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_fullscreen);
         pulsingView = (PulsingQView) findViewById(R.id.pulsingQView);
-        // make this listen to view's clicks...
+
         pulsingView.setOnClickListener(this);
 
+        if (QuuppaTag.getNotifiedActivity(this) == null)
+            QuuppaTag.setNotifiedActivity(this, getClass());
 
-        dfPacketAdvCallback = new AdvertiseCallback() {
-            @Override
-            public void onStartSuccess(AdvertiseSettings advertiseSettings) {
-                final String message = "Broadcasting with tagID: " + getTagId() + " (You can change the id in settings)";
-                Log.d("AdvCallback", message);
-                QuuppaTagEmulationDemoActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(QuuppaTagEmulationDemoActivity.this, message, Toast.LENGTH_LONG).show();
-                    }
-                });
-                pulsingView.setIsPulsing(true);
-            }
-
-            @Override
-            public void onStartFailure(int i) {
-                final String message = "Start broadcast failed error code: " + i;
-                Log.e("AdvCallback", message);
-                QuuppaTagEmulationDemoActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(QuuppaTagEmulationDemoActivity.this, message, Toast.LENGTH_LONG).show();
-                    }
-                });
-                pulsingView.setIsPulsing(false);
-            }
-        };
+        pulsingView.setIsPulsing(QuuppaTag.isServiceEnabled(this));
     }
 
     protected void onDestroy() {
-        // Manage the state of the advertisement as part of activity's lifecycle
-        if (dfPacketAdvCallback != null) QuuppaTag.stopAdvertising(this, dfPacketAdvCallback);
-        dfPacketAdvRunning = false;
-        dfPacketAdvCallback = null;
         super.onDestroy();
+
+        // Check if battery optimization is enabled for this app
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        final String packageName = getPackageName();
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            // Show dialog to prompt user to disable battery optimization
+            new AlertDialog.Builder(this)
+                    .setTitle("Disable Battery Optimization")
+                    .setMessage("We noticed that battery optimizations are not ignored for this application. "
+                            + "This may result in the OS terminating the Quuppa tag service while the app is in "
+                            + " the background. Would you like to disable battery optimizations for this app?")
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            // Open settings to disable battery optimization
+                            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                            intent.setData(Uri.parse("package:" + packageName));
+                            startActivity(intent);
+                        }
+                    })
+                    .setNegativeButton("No", null)
+                    .show();
+        }
     }
 
     @Override
@@ -129,7 +104,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 //Intent intent = new Intent(this, AboutScreenActivity.class);
                 AlertDialog.Builder alert = new AlertDialog.Builder(this);
                 alert.setTitle("Quuppa Tag Emulation Demo app");
-                alert.setMessage("Version 2.0, Copyright 2022 Quuppa Oy");
+                alert.setMessage("Version 2.0, Copyright 2025 Quuppa Oy");
 
                 alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
@@ -146,7 +121,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     @Override
     public void onClick(View v) {
         if (pulsingView.equals(v))
-            toggleDFPacketAdv();
+            toggleQuuppaTagService();
     }
 
     /**
@@ -162,8 +137,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
 
         final EditText manualID = (EditText) view.findViewById(R.id.manualID);
 
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        manualID.setText(getTagId());
+        manualID.setText(QuuppaTag.getOrInitTagId(this));
 
         // add buttons
         builder.setPositiveButton("Ok", null);
@@ -186,64 +160,29 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                     Toast.makeText(QuuppaTagEmulationDemoActivity.this, "Tag ID must be only hex characters! [0-9,a-f]", Toast.LENGTH_LONG).show();
                     return;
                 }
-                // persist!
-                SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-                SharedPreferences.Editor editor = settings.edit();
-                editor.putString(PREFS_MANUAL_TAG_ID, manualID.getText().toString());
-                editor.apply();
 
-                if (dfPacketAdvRunning) {
-                    toggleDFPacketAdv();
-                    toggleDFPacketAdv();
+                QuuppaTag.setTagId(QuuppaTagEmulationDemoActivity.this, manualID.getText().toString());
+                if (QuuppaTag.isServiceEnabled(QuuppaTagEmulationDemoActivity.this)) {
+                    toggleQuuppaTagService();
+                    toggleQuuppaTagService();
                 }
                 dialog.dismiss();
             }
         });
     }
 
-    private String getTagId() {
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        String tagId = settings.getString(PREFS_MANUAL_TAG_ID, null);
-        return (tagId == null || tagId.length() < 12) ? QuuppaTag.getGeneratedTagId(this) : tagId;
-    }
-
     /**
      * Toggles the Direction Finding Packet broadcast on/off.
      */
-    private void toggleDFPacketAdv() {
-        if (!dfPacketAdvRunning) {
-            SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-            String tagID = getTagId();
-            if (tagID == null) {
-                Toast.makeText(QuuppaTagEmulationDemoActivity.this, "Tag ID not set, please enter it in the settings!", Toast.LENGTH_LONG).show();
-                return;
-            }
-            QuuppaTag.DEVICE_ID = tagID;
-            /**
-             * Advertise mode and tx power are fixed to LOW_LATENCY and HIGH power. Adjusting these settings affect the positioning quality and should only be changed with consideration
-             */
-            int mode = settings.getInt(ADV_MODE, AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
-            int tx = settings.getInt(ADV_TX_POWER, AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
-            try {
-                QuuppaTag.startAdvertising(this, dfPacketAdvCallback, true, mode, tx);
-                dfPacketAdvRunning = true;
-            } catch (QuuppaTagException e) {
-                final String message = "Starting Bluetooth advertising failed. " + e.getMessage();
-                Log.d("AdvCallback", message);
-                QuuppaTagEmulationDemoActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(QuuppaTagEmulationDemoActivity.this, message, Toast.LENGTH_LONG).show();
-                    }
-                });
+    private void toggleQuuppaTagService() {
+        boolean enabled = !QuuppaTag.isServiceEnabled(this);
 
-                e.printStackTrace();
-            }
-        } else {
-            QuuppaTag.stopAdvertising(this, dfPacketAdvCallback);
-            dfPacketAdvRunning = false;
-            pulsingView.setIsPulsing(false);
-        }
+        QuuppaTag.setServiceEnabled(this, enabled);
+
+        Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
+        if (enabled) startForegroundService(tagServiceIntent);
+        else stopService(tagServiceIntent);
+        pulsingView.setIsPulsing(enabled);
     }
 
 }

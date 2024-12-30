@@ -3,6 +3,10 @@
           package="com.quuppa.quuppatagdemo">
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
             android:allowBackup="true"
@@ -20,6 +24,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-    </application>
 
+        <service
+                android:name="com.quuppa.tag.QuuppaTagService"
+                android:clearTaskOnLaunch="true"
+                android:enabled="true"
+                android:excludeFromRecents="true"
+                android:exported="false"
+                android:foregroundServiceType="location"
+                android:launchMode="singleInstance" />
+
+        <receiver
+                android:name="com.quuppa.tag.SystemEventBroadcastReceiver"
+                android:enabled="true"
+                android:exported="true"
+                android:label="QuuppaTagServiceAtBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>
