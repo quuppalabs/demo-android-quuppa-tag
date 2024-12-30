@@ -35,12 +35,6 @@ import com.quuppa.tag.QuuppaTagException;
 import java.util.Arrays;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
-    /** name of the stored advertizing mode pref */
-    public static final String ADV_MODE = "advMode";
-    /** name of the stored advertizing tx power pref */
-    public static final String ADV_TX_POWER = "advTxPower";
-    /** Display names of the Adventizing Modes */
-
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
 
