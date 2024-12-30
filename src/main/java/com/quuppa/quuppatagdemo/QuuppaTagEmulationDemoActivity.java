@@ -52,8 +52,8 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
 
         pulsingView.setOnClickListener(this);
 
-        if (QuuppaTag.getNotifiedActivity(this) == null)
-            QuuppaTag.setNotifiedActivity(this, getClass());
+        if (QuuppaTag.getNotifiedActivityClass(this) == null)
+            QuuppaTag.setNotifiedActivityClass(this, getClass());
 
         pulsingView.setIsPulsing(QuuppaTag.isServiceEnabled(this));
     }
