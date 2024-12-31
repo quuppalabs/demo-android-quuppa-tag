@@ -6,5 +6,5 @@
     <string name="action_setTagID">Set tag id</string>
     <string name="action_setAdvMode">Set advertisement mode (TX rate)</string>
     <string name="action_setAdvTxPower">Set advertisement TX power</string>
-    <string name="action_showAbout">About the app</string>
+    <string name="action_showAbout">About this app</string>
 </resources>

@@ -10,6 +10,7 @@
  */
 package com.quuppa.quuppatagdemo;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.le.AdvertisingSetParameters;
@@ -17,10 +18,12 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.text.LineBreaker;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.Layout;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -28,11 +31,18 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 import com.quuppa.tag.QuuppaTag;
 import com.quuppa.tag.QuuppaTagService;
 import com.quuppa.tag.QuuppaTagException;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
@@ -88,6 +98,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         return super.onCreateOptionsMenu(menu);
     }
 
+    @SuppressLint("WrongConstant")
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle presses on the action bar items
@@ -102,7 +113,29 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 //Intent intent = new Intent(this, AboutScreenActivity.class);
                 AlertDialog.Builder alert = new AlertDialog.Builder(this);
                 alert.setTitle("Quuppa Tag Emulation Demo app");
-                alert.setMessage("Version 2.0, Copyright 2025 Quuppa Oy");
+                try {
+                    InputStream is = getResources().getAssets().open("about.txt");
+                    byte[] buffer = new byte[10240];
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    for (int length = is.read(buffer); length != -1; length = is.read(buffer)) {
+                        baos.write(buffer, 0, length);
+                    }
+                    is.close();
+                    baos.close();
+
+                    // alert.setMessage(new String(baos.toByteArray(), StandardCharsets.UTF_8));
+                    TextView messageView = new TextView(this);
+                    messageView.setText(new String(baos.toByteArray(), StandardCharsets.UTF_8));
+                    messageView.setPadding(30, 20, 30, 20);
+                    messageView.setJustificationMode(2); // LineBreaker.JUSTIFICATION_MODE_INTER_WORD); only availabe in 29
+                    // Also, INTER_WORD didn't seem to do anything, 2 is ...INTER_CHARACTER
+
+                    ScrollView scrollView = new ScrollView(this);
+                    scrollView.addView(messageView);
+                    alert.setView(scrollView);
+                } catch (IOException e) {
+                    alert.setMessage("Version 2.0, Copyright 2025 Quuppa Oy. <about.txt wasn't available>");
+                }
 
                 alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {

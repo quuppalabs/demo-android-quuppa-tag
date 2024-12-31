@@ -1,0 +1,7 @@
+This is a *demo* app that partially implements Quuppa V1 tag protocol. Please report bugs (at https://github.com/quuppalabs/demo-android-quuppa-tag) in case the app doesn't work with some specific device and/or newer versions of Android. However, we are not taking feature requests for this app as it's only meant to demonstrate the functionality.
+
+A Quuppa Tag can be tracked in Quuppa Intelligent Locating System but the accuracy partially depends on the phone's antenna so your mileage may vary. The android-quuppa-taglib (https://github.com/quuppalabs/android-quuppa-taglib) that this app uses is primarily meant to be included in your own Android application. The taglib implements a full Android frontend service and once turned on, it will run continuously, even in the background or after reboots. The service also uses the device's accelerometer to determine whether the tag (device) is moving or not.
+
+The service holds a partial wake lock (and the app asks to disable battery optimizations to allow running indefinitely in the background) However, in my testing over various days with a relative modern Android 15/OnePlus 12R, battery usage caused by the Quuppa Tag service was less than 0.2% of the overall battery consumption with light usage. If you use your device for work (if e.g. the device is a handheld scanner) and the screen is on frequently, the battery consumption of the Quuppa Tag service is negligible. - Kalle Korhonen, Chief Product Officer
+
+Copyright 2025 Quuppa Oy
