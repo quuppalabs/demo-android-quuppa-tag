@@ -12,6 +12,7 @@ package com.quuppa.quuppatagdemo;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.bluetooth.le.AdvertisingSetParameters;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -94,6 +95,9 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             case R.id.action_setTagID:
                 setTagId();
                 return true;
+            case R.id.action_select_tx_power:
+                showTxPowerSelectionDialog();
+                return true;
             case R.id.action_showAbout:
                 //Intent intent = new Intent(this, AboutScreenActivity.class);
                 AlertDialog.Builder alert = new AlertDialog.Builder(this);
@@ -163,6 +167,49 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 dialog.dismiss();
             }
         });
+    }
+
+
+    private void showTxPowerSelectionDialog() {
+        final int[] txPowers = {
+                AdvertisingSetParameters.TX_POWER_HIGH,
+                AdvertisingSetParameters.TX_POWER_MEDIUM,
+                AdvertisingSetParameters.TX_POWER_LOW,
+                AdvertisingSetParameters.TX_POWER_ULTRA_LOW
+        };
+        final String[] txPowerLabels = {
+                "High", "Medium", "Low", "Ultra Low"
+        };
+
+        int currentTxPower = QuuppaTag.getAdvertisingSetTxPower(this);
+        int currentIndex = 0;
+        for (int i = 0; i < txPowers.length; i++) {
+            if (txPowers[i] == currentTxPower) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Select TX Power")
+                .setSingleChoiceItems(txPowerLabels, currentIndex, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        QuuppaTag.setAdvertisingSetTxPower(getApplicationContext(), txPowers[which]);
+                        restartServiceIfEnabled();
+                        dialog.dismiss();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void restartServiceIfEnabled() {
+        if (QuuppaTag.isServiceEnabled(this)) {
+            Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
+            stopService(tagServiceIntent);
+            startForegroundService(tagServiceIntent);
+        }
     }
 
     /**
