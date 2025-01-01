@@ -8,7 +8,7 @@
  * INCLUDING WITHOUT LIMITATION TO THOSE CONCERNING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT
  * OF THIRD PARTY INTELLECTUAL PROPERTY RIGHTS ARE HEREBY EXCLUDED.
  */
-package com.quuppa.quuppatagdemo;
+package com.quuppa.quuppatag;
 
 import android.content.Context;
 import android.graphics.Canvas;

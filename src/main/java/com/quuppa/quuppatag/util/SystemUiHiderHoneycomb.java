@@ -1,4 +1,4 @@
-package com.quuppa.quuppatagdemo.util;
+package com.quuppa.quuppatag.util;
 
 import android.annotation.TargetApi;
 import android.app.Activity;

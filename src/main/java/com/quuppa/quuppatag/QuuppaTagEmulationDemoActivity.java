@@ -8,23 +8,19 @@
  * INCLUDING WITHOUT LIMITATION TO THOSE CONCERNING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT
  * OF THIRD PARTY INTELLECTUAL PROPERTY RIGHTS ARE HEREBY EXCLUDED.
  */
-package com.quuppa.quuppatagdemo;
+package com.quuppa.quuppatag;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.le.AdvertisingSetParameters;
-import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.graphics.text.LineBreaker;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.text.Layout;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -36,14 +32,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.quuppa.tag.QuuppaTag;
 import com.quuppa.tag.QuuppaTagService;
-import com.quuppa.tag.QuuppaTagException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Arrays;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
     /** reference to the custom UI view that renders the pulsing Q */
