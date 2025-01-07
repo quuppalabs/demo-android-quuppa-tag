@@ -46,6 +46,7 @@ public class PulsingQView extends View {
         paint.setColor(Color.parseColor("#FFFFFF"));
         paint.setStrokeWidth(40);
         mHandler = new Handler();
+        this.setContentDescription("Quuppa Tag Service Status");
     }
 
     private final Runnable mRunnable = new Runnable() {
@@ -61,6 +62,7 @@ public class PulsingQView extends View {
         this.invalidate();
         if (pulsing)
             mHandler.postDelayed(mRunnable, mSampleDurationTime);
+        setContentDescription("Quuppa Tag Service " + (pulsing ? "enabled" : "disabled"));
     }
 
     @Override
