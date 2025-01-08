@@ -10,6 +10,7 @@
  */
 package com.quuppa.quuppatag;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -17,6 +18,7 @@ import android.bluetooth.le.AdvertisingSetParameters;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -234,8 +236,17 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         if (QuuppaTag.isServiceEnabled(this)) {
             Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
             stopService(tagServiceIntent);
-            startForegroundService(tagServiceIntent);
+            startServiceWithPermissionCheck(tagServiceIntent);
         }
+    }
+
+    private boolean startServiceWithPermissionCheck(Intent tagServiceIntent) {
+        if (checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
+            return false;
+        }
+        startForegroundService(tagServiceIntent);
+        return true;
     }
 
     /**
@@ -244,11 +255,10 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     private void toggleQuuppaTagService() {
         boolean enabled = !QuuppaTag.isServiceEnabled(this);
 
-        QuuppaTag.setServiceEnabled(this, enabled);
-
         Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
-        if (enabled) startForegroundService(tagServiceIntent);
+        if (enabled) enabled = startServiceWithPermissionCheck(tagServiceIntent);
         else stopService(tagServiceIntent);
+        QuuppaTag.setServiceEnabled(this, enabled);
         pulsingView.setIsPulsing(enabled);
     }
 
