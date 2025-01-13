@@ -15,14 +15,13 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.le.AdvertisingSetParameters;
-import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
+import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -32,6 +31,7 @@ import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.quuppa.tag.IntentAction;
 import com.quuppa.tag.QuuppaTag;
 import com.quuppa.tag.QuuppaTagService;
 
@@ -43,6 +43,27 @@ import java.nio.charset.StandardCharsets;
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
+
+    private BroadcastReceiver serviceBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Ensure the Toast is displayed on the UI thread
+            Log.v(QuuppaTagService.class.getSimpleName(), "ServiceBroadcastReceiver.onReceive(), action " + intent.getAction());
+
+            runOnUiThread(() -> {
+                String message = null;
+                if (IntentAction.QT_STARTED.fqdn().equals(intent.getAction()))
+                    message = "Broadcasting with tagID: " + getTagId();
+                else if (IntentAction.QT_STOPPED.fqdn().equals(intent.getAction()))
+                    message = "Broadcasting stopped";
+                else if (IntentAction.QT_SYSTEM_ERROR.fqdn().equals(intent.getAction())) {
+                    String error = intent.getStringExtra("error");
+                    message = "Start broadcast failed" + (error == null ? "" : " with error: " + error);
+                }
+                if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+            });
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,9 +79,28 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         pulsingView.setIsPulsing(QuuppaTag.isServiceEnabled(this));
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter();
+        for (IntentAction action : IntentAction.values()) {
+            filter.addAction(action.fqdn());
+        }
+        // RECEIVER_NOT_EXPORTED requires target package to be set in intent
+        // intent.setPackage(context.packageName)
+        // https://issuetracker.google.com/issues/293487554
+        // As a generic library, better use generic events
+        registerReceiver(serviceBroadcastReceiver, filter,  RECEIVER_EXPORTED);
+    }
+
+    @Override
+    protected void onPause() {
+        unregisterReceiver(serviceBroadcastReceiver);
+        super.onPause();
+    }
+
     protected void onDestroy() {
         super.onDestroy();
-
         // Check if battery optimization is enabled for this app
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         final String packageName = getPackageName();
@@ -163,7 +203,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
 
         final EditText manualID = (EditText) view.findViewById(R.id.manualID);
 
-        manualID.setText(QuuppaTag.getOrInitTagId(this));
+        manualID.setText(getTagId());
 
         // add buttons
         builder.setPositiveButton("Ok", null);
@@ -197,6 +237,9 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         });
     }
 
+    private String getTagId() {
+        return QuuppaTag.getOrInitTagId(this);
+    }
 
     private void showTxPowerSelectionDialog() {
         final int[] txPowers = {
