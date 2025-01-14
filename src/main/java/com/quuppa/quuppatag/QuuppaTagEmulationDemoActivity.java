@@ -18,6 +18,7 @@ import android.bluetooth.le.AdvertisingSetParameters;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -48,8 +49,6 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         @Override
         public void onReceive(Context context, Intent intent) {
             // Ensure the Toast is displayed on the UI thread
-            Log.v(QuuppaTagService.class.getSimpleName(), "ServiceBroadcastReceiver.onReceive(), action " + intent.getAction());
-
             runOnUiThread(() -> {
                 String message = null;
                 if (IntentAction.QT_STARTED.fqdn().equals(intent.getAction()))
@@ -284,10 +283,11 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     }
 
     private boolean startServiceWithPermissionCheck(Intent tagServiceIntent) {
-        if (checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
-            return false;
-        }
+        if (Build.VERSION.SDK_INT >= 31) // Build.VERSION_CODES.SNOW_CONE
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
+                return false;
+            }
         startForegroundService(tagServiceIntent);
         return true;
     }
