@@ -14,6 +14,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.AdvertisingSetParameters;
 import android.content.*;
 import android.content.pm.PackageManager;
@@ -42,6 +43,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
+    private static final int REQUEST_ENABLE_BT = 1;
+
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
 
@@ -283,6 +286,24 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     }
 
     private boolean startServiceWithPermissionCheck(Intent tagServiceIntent) {
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter == null) {
+            Toast.makeText(this, "Bluetooth is not supported on this device", Toast.LENGTH_LONG).show();
+            return false;
+        }
+        else if (!bluetoothAdapter.isEnabled()) {
+            if (Build.VERSION.SDK_INT >= 31) {
+                if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1);
+                    return false;
+                }
+            }
+
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+            return false;
+        }
+
         if (Build.VERSION.SDK_INT >= 31) // Build.VERSION_CODES.SNOW_CONE
             if (checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
@@ -290,6 +311,15 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             }
         startForegroundService(tagServiceIntent);
         return true;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_ENABLE_BT) {
+            if (resultCode == RESULT_OK) toggleQuuppaTagService();
+            else Toast.makeText(this, "This app does not work with Bluetooth disabled", Toast.LENGTH_LONG).show();
+        }
     }
 
     /**
