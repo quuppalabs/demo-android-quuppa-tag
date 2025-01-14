@@ -38,8 +38,8 @@ android {
         targetSdkVersion 34
         // versionName and code don't have any direct relation. VersionCode must be increased for any new version uploaded to play store
         // Probably should figure some reasonable version strategy
-        versionCode 7
-        versionName "2.0.7"
+        versionCode 8
+        versionName "2.0.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,7 +60,7 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.quuppa:android-quuppa-taglib:2.0.5'
+    implementation 'com.quuppa:android-quuppa-taglib:2.0.6'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
