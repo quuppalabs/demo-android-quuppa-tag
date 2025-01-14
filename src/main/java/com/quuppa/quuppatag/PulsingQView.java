@@ -1,7 +1,7 @@
 /**
  * Quuppa Android Tag Emulation Demo application.
  *
- * Copyright 2015 Quuppa Oy
+ * Copyright 2025 Quuppa Oy
  *
  * Disclaimer
  * THE SOURCE CODE, DOCUMENTATION AND SPECIFICATIONS ARE PROVIDED “AS IS”. ALL LIABILITIES, WARRANTIES AND CONDITIONS, EXPRESS OR IMPLIED,

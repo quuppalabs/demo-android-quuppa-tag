@@ -1,7 +1,7 @@
 /**
  * Quuppa Android Tag Emulation Demo application.
  * <p/>
- * Copyright 2022 Quuppa Oy
+ * Copyright 2025 Quuppa Oy
  * <p/>
  * Disclaimer
  * THE SOURCE CODE, DOCUMENTATION AND SPECIFICATIONS ARE PROVIDED “AS IS”. ALL LIABILITIES, WARRANTIES AND CONDITIONS, EXPRESS OR IMPLIED,
@@ -13,6 +13,7 @@ package com.quuppa.quuppatag;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.AdvertisingSetParameters;
@@ -302,6 +303,28 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
             return false;
+        }
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Permission needed to schedule alarms")
+                        .setMessage("The app relies on the accelerometer to know when the device is moving. "
+                                + "Inversely, the app needs to schedule a timed event (alarm) to set state back to stationary "
+                                + "and to slow the rate of advertisements. This reduces battery consumption.")
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // Prompt user to grant the schedule exact alarm
+                                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            }
+                        })
+                        .show();
+                return false;
+            }
         }
 
         if (Build.VERSION.SDK_INT >= 31) // Build.VERSION_CODES.SNOW_CONE
