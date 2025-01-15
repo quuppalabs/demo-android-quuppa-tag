@@ -2,7 +2,7 @@
 
 This is a Quuppa tag emulation sample app for Android. It's primary purpose is to demonstrate the usage of the [Quuppa Tag emulation library for Android](https://github.com/quuppalabs/android-quuppa-taglib). With this app, you can track your Android device in [Quuppa Intelligent Locating System](https://www.quuppa.com/).
 
-A version, usually the most recent version of this [app is available on Google Play Store](https://play.google.com/store/apps/details?id=com.quuppa.quuppatag&pli=1). I ([kaosko](https://github.com/kaosko)) haven't bothered tagging the app source code, so see AndroidManifest.xml history for versionCode changes (the accompanied [Quuppa Tag library is of course properly tagged and available through Maven central repository](https://search.maven.org/artifact/com.quuppa/android-quuppa-taglib)). 
+A version, usually the most recent version of this [app is available on Google Play Store](https://play.google.com/store/apps/details?id=com.quuppa.quuppatag&pli=1). I ([kaosko](https://github.com/kaosko)) haven't bothered tagging the app source code, so see AndroidManifest.xml history for versionCode changes. However, the accompanied [Quuppa Tag library is of course properly tagged, versioned and available through Maven central repository](https://search.maven.org/artifact/com.quuppa/android-quuppa-taglib). 
 
 ## Getting Started
 
