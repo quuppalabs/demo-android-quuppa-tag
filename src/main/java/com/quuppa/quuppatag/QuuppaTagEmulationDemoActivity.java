@@ -52,19 +52,24 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     private BroadcastReceiver serviceBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Ensure the Toast is displayed on the UI thread
-            runOnUiThread(() -> {
-                String message = null;
-                if (IntentAction.QT_STARTED.fqdn().equals(intent.getAction()))
-                    message = "Broadcasting with tagID: " + getTagId();
-                else if (IntentAction.QT_STOPPED.fqdn().equals(intent.getAction()))
-                    message = "Broadcasting stopped";
-                else if (IntentAction.QT_SYSTEM_ERROR.fqdn().equals(intent.getAction())) {
-                    String error = intent.getStringExtra("error");
-                    message = "Start broadcast failed" + (error == null ? "" : " with error: " + error);
-                }
-                if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show();
-            });
+            try {
+                IntentAction intentAction = IntentAction.fullyQualifiedValueOf(intent.getAction());
+                // Ensure the Toast is displayed on the UI thread
+                runOnUiThread(() -> {
+                    String message = null;
+                    if (IntentAction.QT_STARTED.equals(intentAction))
+                        message = "Broadcasting with tagID: " + getTagId();
+                    else if (IntentAction.QT_STOPPED.equals(intentAction))
+                        message = "Broadcasting stopped";
+                    else if (IntentAction.QT_SYSTEM_ERROR.equals(intentAction)) {
+                        String error = intent.getStringExtra("error");
+                        message = "Start broadcast failed" + (error == null ? "" : " with error: " + error);
+                    }
+                    if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) {
+                // unknown intent, ignore
+            }
         }
     };
 
@@ -87,7 +92,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         super.onResume();
         IntentFilter filter = new IntentFilter();
         for (IntentAction action : IntentAction.values()) {
-            filter.addAction(action.fqdn());
+            filter.addAction(action.fullyQualifiedName());
         }
         // RECEIVER_NOT_EXPORTED requires target package to be set in intent
         // intent.setPackage(context.packageName)
@@ -231,10 +236,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 }
 
                 QuuppaTag.setTagId(QuuppaTagEmulationDemoActivity.this, manualID.getText().toString());
-                if (QuuppaTag.isServiceEnabled(QuuppaTagEmulationDemoActivity.this)) {
-                    toggleQuuppaTagService();
-                    toggleQuuppaTagService();
-                }
+                restartServiceIfEnabled();
                 dialog.dismiss();
             }
         });
@@ -279,14 +281,10 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     }
 
     private void restartServiceIfEnabled() {
-        if (QuuppaTag.isServiceEnabled(this)) {
-            Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
-            stopService(tagServiceIntent);
-            startServiceWithPermissionCheck(tagServiceIntent);
-        }
+        if (QuuppaTag.isServiceEnabled(this)) QuuppaTag.restart(QuuppaTagEmulationDemoActivity.this);
     }
 
-    private boolean startServiceWithPermissionCheck(Intent tagServiceIntent) {
+    private boolean startServiceWithPermissionCheck() {
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
             Toast.makeText(this, "Bluetooth is not supported on this device", Toast.LENGTH_LONG).show();
@@ -332,7 +330,9 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
                 return false;
             }
+        Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
         startForegroundService(tagServiceIntent);
+        QuuppaTag.setServiceEnabled(this, true);
         return true;
     }
 
@@ -351,10 +351,8 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     private void toggleQuuppaTagService() {
         boolean enabled = !QuuppaTag.isServiceEnabled(this);
 
-        Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
-        if (enabled) enabled = startServiceWithPermissionCheck(tagServiceIntent);
-        else stopService(tagServiceIntent);
-        QuuppaTag.setServiceEnabled(this, enabled);
+        if (enabled) enabled = startServiceWithPermissionCheck();
+        else QuuppaTag.stop(this);
         pulsingView.setIsPulsing(enabled);
     }
 
