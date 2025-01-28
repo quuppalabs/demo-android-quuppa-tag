@@ -149,13 +149,14 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             case R.id.action_setTagID:
                 setTagId();
                 return true;
-            case R.id.action_select_tx_power:
-                showTxPowerSelectionDialog();
-                return true;
+// Selecting tx power is implemented but there's no particular reason to give user the option to change it
+//            case R.id.action_select_tx_power:
+//                showTxPowerSelectionDialog();
+//                return true;
             case R.id.action_showAbout:
                 //Intent intent = new Intent(this, AboutScreenActivity.class);
                 AlertDialog.Builder alert = new AlertDialog.Builder(this);
-                alert.setTitle("Quuppa Tag Emulation Demo app");
+                alert.setTitle("Quuppa Tag Emulation Demo app, version " + BuildConfig.VERSION_NAME);
                 try {
                     InputStream is = getResources().getAssets().open("about.txt");
                     byte[] buffer = new byte[10240];
