@@ -38,8 +38,8 @@ android {
         targetSdkVersion 34
         // versionName and code don't have any direct relation. VersionCode must be increased for any new version uploaded to play store
         // Probably should figure some reasonable version strategy
-        versionCode 14
-        versionName "2.0.14"
+        versionCode 15
+        versionName "2.0.15"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
