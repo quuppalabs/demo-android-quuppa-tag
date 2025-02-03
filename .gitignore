@@ -8,4 +8,5 @@ gradle
 /captures
 .externalNativeBuild
 .cxx
-/release/
+/release/output-metadata.json
+/release/android-quuppa-tag-release.aab
