@@ -6,4 +6,9 @@ The android-quuppa-taglib (https://github.com/quuppalabs/android-quuppa-taglib) 
 
 The service holds a partial wake lock (and the app asks to disable battery optimizations to allow running indefinitely in the background). However, in my testing over several weeks with a relative modern Android 15/OnePlus 12R, battery usage caused by the Quuppa Tag service was less than 0.1% of the overall battery consumption with light usage of other apps. If you use your device for work (if e.g. the device is a handheld scanner) and the screen is on frequently, the battery consumption of the Quuppa Tag service is negligible. The app & the library has been extensively tested on many Android versions ranging from 10 to 16, as well as various different devices, including Google Pixel 7/4a, Samsung Galaxy A14/Note 10+, DataLogic Scorpio X5 etc. - Kalle Korhonen, Chief Product Officer
 
+Terms of Use
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE APPLICATION IS PROVIDED “AS IS” WITH NO WARRANTIES WHATSOEVER, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, AND QUUPPA EXPRESSLY DISCLAIMS ANY WARRANTY OF MERCHANTABILITY, NONINFRINGEMENT, FITNESS FOR ANY PARTICULAR PURPOSE, OR ANY OTHER WARRANTY. THE ENTIRE RISK FOR USING THE SPECIFICATIONS AND PERFORMANCE THEREOF REMAINS WITH YOU.
+IN NO EVENT SHALL QUUPPA BE LIABLE TO YOU OR TO ANY OTHER PARTY FOR THE COST OF PROCURING ANY GOODS OR SERVICES, LOST PROFITS, LOSS OF USE, LOSS OF DATA OR ANY INCIDENTAL, CONSEQUENTIAL, INDIRECT, OR SPECIAL DAMAGES OF ANY KIND, WHETHER UNDER CONTRACT, TORT, WARRANTY OR OTHERWISE AND ARISING IN ANY WAY OUT OF THESE TERMS OF USE, WHETHER OR NOT QUUPPA HAD ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES.
+
 Copyright 2025 Quuppa Oy
