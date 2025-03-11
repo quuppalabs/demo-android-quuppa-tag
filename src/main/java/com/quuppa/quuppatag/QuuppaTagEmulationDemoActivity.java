@@ -19,20 +19,22 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.AdvertisingSetParameters;
 import android.content.*;
 import android.content.pm.PackageManager;
-import android.net.Uri;
+import android.location.Location;
+import android.location.LocationManager;
+import android.net.*;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.View;
+import android.util.Log;
+import android.view.*;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import com.quuppa.tag.IntentAction;
 import com.quuppa.tag.QuuppaTag;
 import com.quuppa.tag.QuuppaTagService;
@@ -40,10 +42,20 @@ import com.quuppa.tag.QuuppaTagService;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
     private static final int REQUEST_ENABLE_BT = 1;
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 2;
+    private static final int WIFI_PERMISSION_REQUEST_CODE = 3;
+    private static final int FINE_LOCATION_PERMISSION_REQUEST_CODE = 4;
+    private static final int NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE = 5;
+
+    private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 6;
 
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
@@ -71,10 +83,42 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             }
         }
     };
+    private SharedPreferences preferences;
+    private ConnectivityManager connectivityManager;
+    private LocationManager locationManager;
+    private final NetworkRequest networkRequest =
+            new NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .build();
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        preferences = getSharedPreferences(QuuppaTag.PREFS, Context.MODE_PRIVATE);
+        connectivityManager = getSystemService(ConnectivityManager.class);
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            // ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO in API 31, const value 1
+            // without passing the flag, we couldn't read the SSID
+            networkCallback = new ConnectivityManager.NetworkCallback(1) {
+                @Override
+                public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+                    onNetworkCapabilitiesChanged(network, networkCapabilities, this);
+                }
+            };
+        }
+        else {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+                    onNetworkCapabilitiesChanged(network, networkCapabilities, this);
+                }
+            };
+        }
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
         setContentView(R.layout.activity_fullscreen);
         pulsingView = (PulsingQView) findViewById(R.id.pulsingQView);
 
@@ -140,6 +184,18 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         return super.onCreateOptionsMenu(menu);
     }
 
+    @Override
+    public boolean onPrepareOptionsMenu (Menu menu) {
+        MenuItem menuEnableOnlyWhen = menu.findItem(R.id.menu_enable_only_when);
+        // Too many variations in permissions, getting SSID etc. just don't show this option for older devices
+        if (Build.VERSION.SDK_INT < 33) menuEnableOnlyWhen.setVisible(false);
+        else {
+            menuEnableOnlyWhen.setChecked(preferences.contains(QuuppaTag.PREFS_SELECTED_LOCATION) || preferences.contains(QuuppaTag.PREFS_SELECTED_WIFI));
+            menuEnableOnlyWhen.setEnabled(QuuppaTag.isServiceEnabled(this));
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
     @SuppressLint("WrongConstant")
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -186,11 +242,208 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 });
                 alert.show();
                 return true;
+            case R.id.menu_enable_only_when:
+                showEnableConditionsDialog();
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
     }
 
+    private void showEnableConditionsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        String locationSelection = preferences.getString(QuuppaTag.PREFS_SELECTED_LOCATION, null);
+        String locationOption = locationSelection == null ?
+                "only when within 1 km/ 0.6 mile radius of current location" :
+                "only when within 1 km/ 0.6 mile radius of previously set location (" + locationSelection + ")";
+
+        String wifiSelection = preferences.getString(QuuppaTag.PREFS_SELECTED_WIFI, null);
+
+        String wifiOption;
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        WifiInfo currentWifi = wifiManager.getConnectionInfo();
+
+        Log.d(QuuppaTagService.class.getSimpleName(), "Current Wifi info " + currentWifi);
+
+        if (!wifiManager.isWifiEnabled() || currentWifi == null || currentWifi.getNetworkId() == -1) wifiOption = "Wi-Fi must be connected to limit to a specific Wi-Fi network";
+        else wifiOption = wifiSelection == null ?
+                "only when using currently connected Wi-Fi network" :
+                "only when connected to Wi-Fi network " + wifiSelection;
+
+        String[] options = {"always", locationOption, wifiOption};
+        int selectedIdx = 0;
+        if (locationSelection != null) selectedIdx = 1;
+        else if (wifiSelection != null) selectedIdx = 2;
+
+        AlertDialog alertDialog = builder.setTitle("Keep active")
+                .setSingleChoiceItems(options, selectedIdx, (dialog, which) -> {
+                    if (which == 1) {
+                        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+                        else if (Build.VERSION.SDK_INT >= 29 && checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE);
+                        else if (locationSelection == null) selectOnlyWhenLocation();
+                    } else if (which == 2) {
+                        if (checkSelfPermission(Manifest.permission.ACCESS_WIFI_STATE) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_WIFI_STATE}, WIFI_PERMISSION_REQUEST_CODE);
+                        else if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, FINE_LOCATION_PERMISSION_REQUEST_CODE);
+                        else if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.NEARBY_WIFI_DEVICES}, NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE);
+                        else if (Build.VERSION.SDK_INT >= 29 && checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE);
+                        else if (wifiSelection == null) selectOnlyWhenWifi();
+                    } else {
+                        removeOnlyWhenSelection();
+                    }
+                    dialog.dismiss();
+                })
+                .create();
+
+        alertDialog.getListView().setOnHierarchyChangeListener(
+                new ViewGroup.OnHierarchyChangeListener() {
+                    @Override
+                    public void onChildViewAdded(View parent, View child) {
+                        CharSequence text = ((TextView)child).getText();
+                        if (text.toString().startsWith("Wi-Fi must")) child.setEnabled(false);
+                    }
+
+                    @Override
+                    public void onChildViewRemoved(View view, View view1) {
+                    }
+                });
+
+        alertDialog.show();
+    }
+
+    private void removeOnlyWhenSelection() {
+        SharedPreferences preferences = getSharedPreferences(QuuppaTag.PREFS, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.remove(QuuppaTag.PREFS_SELECTED_LOCATION);
+        editor.remove(QuuppaTag.PREFS_SELECTED_WIFI);
+        editor.commit();
+        Intent serviceIntent = new Intent(QuuppaTagEmulationDemoActivity.this, QuuppaTagService.class);
+        serviceIntent.setAction(IntentAction.QT_ACTIVE_ONLY_CHANGED.fullyQualifiedName());
+        startForegroundService(serviceIntent);
+    }
+
+    private void selectOnlyWhenLocation() {
+        preferences.edit().remove(QuuppaTag.PREFS_SELECTED_WIFI).apply();
+        List<String> providers = locationManager.getProviders(true);
+        Location bestLocation = null;
+        try {
+            for (String provider : providers) {
+                Location l = locationManager.getLastKnownLocation(provider);
+                if (l == null) {
+                    continue;
+                }
+                if (bestLocation == null || l.getAccuracy() < bestLocation.getAccuracy()) {
+                    // Found best last known location: %s", l);
+                    bestLocation = l;
+                }
+            }
+        } catch (SecurityException e) {
+            // handle with null bestLocation
+        }
+        if (bestLocation != null) {
+            String locationString = bestLocation.getLatitude() + "," + bestLocation.getLongitude();
+            preferences.edit().putString(QuuppaTag.PREFS_SELECTED_LOCATION, locationString).apply();
+            Toast.makeText(this, "Active location lat,long set to: " + locationString, Toast.LENGTH_LONG).show();
+        }
+        else {
+            preferences.edit().remove(QuuppaTag.PREFS_SELECTED_LOCATION).apply();
+            Toast.makeText(this, "Couldn't get any last location, you must enable location services from Settings", Toast.LENGTH_LONG).show();
+        }
+
+        Intent serviceIntent = new Intent(this, QuuppaTagService.class);
+        serviceIntent.setAction(IntentAction.QT_ACTIVE_ONLY_CHANGED.fullyQualifiedName());
+        startForegroundService(serviceIntent);
+    }
+
+    private void selectOnlyWhenWifi() {
+//        preferences.edit().remove(PREFS_LOCATION_RADIUS).apply();
+        preferences.edit().remove(QuuppaTag.PREFS_SELECTED_LOCATION).apply();
+        connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
+        connectivityManager.requestNetwork(networkRequest, networkCallback);
+    }
+    
+/*
+    private void showRadiusSelectionDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        int selectedIdx = preferences.getInt(PREFS_LOCATION_RADIUS, -1); // Default to -1 if no preference set
+        String[] distances = {"1km/ 0.6 miles", "5 km/ 3.1 miles", "25 km/ 15.6 miles"};
+        // Only have the remove option if one option is currently selected
+        if (selectedIdx >= 0) {
+            distances = Arrays.copyOf(distances, distances.length + 1);
+            distances[distances.length-1] = "Remove & allow always enabled";
+        }
+        // need to be final
+        final String[] options = distances;
+
+        builder.setTitle("Select Distance")
+                .setSingleChoiceItems(options, selectedIdx, (dialog, which) -> {
+                    if (which < 0 || which > 2) {
+                        preferences.edit().remove(PREFS_LOCATION_RADIUS).apply();
+                        Toast.makeText(this, "Always enabled", Toast.LENGTH_SHORT).show();
+                    } else {
+                        preferences.edit().remove(QuuppaTag.PREFS_SELECTED_WIFI).apply();
+                        preferences.edit().putInt(PREFS_LOCATION_RADIUS, (which + 1) * 4).apply();
+                        List<String> providers = locationManager.getProviders(true);
+
+                        Location l = null;
+                        try {
+                            for (int i = 0; i < providers.size(); i++) {
+                                l = locationManager.getLastKnownLocation(providers.get(i));
+                                if (l != null) {
+                                    String locationString = l.getLatitude() + "," + l.getLongitude();
+                                    preferences.edit().putString(QuuppaTag.PREFS_SELECTED_LOCATION, locationString).apply();
+                                    Toast.makeText(this, "Active location lat,long set to: " + locationString, Toast.LENGTH_LONG).show();
+                                    break;
+                                }
+                            }
+                        } catch (SecurityException e) {
+                            preferences.edit().remove(PREFS_LOCATION_RADIUS).apply();
+                            preferences.edit().remove(QuuppaTag.PREFS_SELECTED_LOCATION).apply();
+                            Toast.makeText(this, "Couldn't get any last location, you must enable location services from Settings", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private void showWifiSelectionDialog() {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        WifiInfo currentWifi = wifiManager.getConnectionInfo();
+
+//        if ("<unknown ssid>".equalsIgnoreCase(currentWifi.getSSID())) {
+//            Toast.makeText(this, "Cannot get ", Toast.LENGTH_SHORT).show();
+//            return;
+//        }
+
+        if (currentWifi != null) {
+            String wifiName = currentWifi.getSSID();
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Select Wi-Fi")
+                    .setItems(new String[]{wifiName, "Remove & allow always enabled"}, (dialog, which) -> {
+                        if (which == 1) {
+                            preferences.edit().remove(QuuppaTag.PREFS_SELECTED_WIFI).apply();
+                            Toast.makeText(this, "Always enabled", Toast.LENGTH_SHORT).show();
+                        } else {
+                            preferences.edit().remove(PREFS_LOCATION_RADIUS).apply();
+                            preferences.edit().remove(QuuppaTag.PREFS_SELECTED_LOCATION).apply();
+                            preferences.edit().putString(QuuppaTag.PREFS_SELECTED_WIFI, wifiName).apply();
+                            connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
+                            connectivityManager.requestNetwork(networkRequest, networkCallback);
+                        }
+                        dialog.dismiss();
+                    })
+                    .show();
+        } else {
+            Toast.makeText(this, "No Wi-Fi connected", Toast.LENGTH_SHORT).show();
+        }
+    }
+ */
 
     @Override
     public void onClick(View v) {
@@ -293,7 +546,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         else if (!bluetoothAdapter.isEnabled()) {
             if (Build.VERSION.SDK_INT >= 31) {
                 if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1);
+                    requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQUEST_ENABLE_BT);
                     return false;
                 }
             }
@@ -330,10 +583,73 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_ADVERTISE}, 1);
                 return false;
             }
+
         Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
         startForegroundService(tagServiceIntent);
         QuuppaTag.setServiceEnabled(this, true);
         return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(this, "Location permission is required", Toast.LENGTH_SHORT).show();
+            // Make sure the only place where this is requested is when user chooses the menu item, otherwise need
+            // more complex to know where the user was when request was invoked
+            else {
+                // ACCESS_BACKGROUND_LOCATION doesn't exist before API level 29
+                if (Build.VERSION.SDK_INT >= 29 && checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE);
+                else selectOnlyWhenLocation();
+            }
+        }
+        else if (requestCode == WIFI_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(this, "Wi-Fi state permission is required", Toast.LENGTH_SHORT).show();
+            // Make sure the only place where this is requested is when user chooses the menu item, otherwise need
+            // more complex to know where the user was when request was invoked
+            else {
+                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, FINE_LOCATION_PERMISSION_REQUEST_CODE);
+                else if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{Manifest.permission.NEARBY_WIFI_DEVICES}, NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE);
+                else selectOnlyWhenWifi();
+            }
+        }
+        else if (requestCode == FINE_LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(this, "Fine location permission is required to access connected Wi-Fi SSID", Toast.LENGTH_SHORT).show();
+                // Make sure the only place where this is requested is when user chooses the menu item, otherwise need
+                // more complex to know where the user was when request was invoked
+            else {
+                if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{Manifest.permission.NEARBY_WIFI_DEVICES}, NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE);
+                else selectOnlyWhenWifi();
+            }
+        }
+        else if (requestCode == NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(this, "Nearby wifi devices is required to access connected Wi-Fi SSID", Toast.LENGTH_SHORT).show();
+            // We need ACCESS_WIFI_STATE and ACCESS_FINE_LOCATION before we can read SSID
+            // We need ACCESS_BACKGROUND_LOCATION to read SSID in the service
+            else {
+                // ACCESS_BACKGROUND_LOCATION doesn't exist before API level 29
+                if (Build.VERSION.SDK_INT >= 29 && checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE);
+                else selectOnlyWhenWifi();
+            }
+        }
+        else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(this, "Permission to access location in the background is required for this feature", Toast.LENGTH_LONG).show();
+            else {
+                // We can get to this from either of the two "active only when..." menu items, they both shouldn't have value at the same time
+                if (QuuppaTag.getSelectedWifi(this) != null) selectOnlyWhenWifi();
+                else if (QuuppaTag.getSelectedLocation(this) != null) selectOnlyWhenLocation();
+            }
+        }
     }
 
     @Override
@@ -356,5 +672,25 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         pulsingView.setIsPulsing(enabled);
     }
 
+    private void onNetworkCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities, ConnectivityManager.NetworkCallback networkCallback) {
+        // Don't allow calling this operation from device with API level < 29
+        try {
+            Method method = NetworkCapabilities.class.getMethod("getTransportInfo", new Class<?>[]{});
+            WifiInfo wifiInfo = (WifiInfo) method.invoke(networkCapabilities);
+            // TODO if SSID is null, remove the preference?
+            String ssid= wifiInfo.getSSID();
+            if (ssid == null) preferences.edit().remove(QuuppaTag.PREFS_SELECTED_WIFI).apply();
+            else preferences.edit().putString(QuuppaTag.PREFS_SELECTED_WIFI, wifiInfo.getSSID()).apply();
+            Intent serviceIntent = new Intent(QuuppaTagEmulationDemoActivity.this, QuuppaTagService.class);
+            serviceIntent.setAction(IntentAction.QT_ACTIVE_ONLY_CHANGED.fullyQualifiedName());
+            startForegroundService(serviceIntent);
+
+            runOnUiThread(() -> {
+                if (ssid != null) Toast.makeText(QuuppaTagEmulationDemoActivity.this, "Active only on " + ssid, Toast.LENGTH_SHORT).show();
+            });
+        } catch (Exception e) {}
+
+        connectivityManager.unregisterNetworkCallback(networkCallback);
+    }
 }
 

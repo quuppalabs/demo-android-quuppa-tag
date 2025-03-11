@@ -7,6 +7,11 @@
         android:id="@+id/action_select_tx_power"
         android:title="Select TX Power"/>
 -->
+    <group android:checkableBehavior="all">
+    <item
+        android:id="@+id/menu_enable_only_when"
+        android:title="Active only when..."/>
+    </group>
     <item android:id="@+id/action_showAbout"
         android:icon="@drawable/ic_launcher"
         android:title="@string/action_showAbout" />
