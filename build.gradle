@@ -29,12 +29,12 @@ allprojects {
 //}
 
 android {
-    compileSdkVersion 34
+    compileSdkVersion 35
 
     defaultConfig {
         applicationId "com.quuppa.quuppatag"
         minSdkVersion 26
-        targetSdkVersion 34
+        targetSdkVersion 35
         // versionName and code don't have any direct relation. VersionCode must be increased for any new version uploaded to play store
         // Probably should figure some reasonable version strategy
         versionCode 18
