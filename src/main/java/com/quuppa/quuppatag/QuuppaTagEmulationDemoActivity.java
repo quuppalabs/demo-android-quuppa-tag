@@ -32,6 +32,7 @@ import android.util.Log;
 import android.view.*;
 import android.widget.EditText;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -59,6 +60,8 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
 
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
+    private Switch backgroundModeSwitch;
+    private boolean awaitingAlarmPermissionResult = false;
 
     private BroadcastReceiver serviceBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -120,9 +123,36 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         setContentView(R.layout.activity_fullscreen);
+        setActionBar(findViewById(R.id.toolbar));
         pulsingView = (PulsingQView) findViewById(R.id.pulsingQView);
+        backgroundModeSwitch = findViewById(R.id.background_mode_switch);
 
         pulsingView.setOnClickListener(this);
+        backgroundModeSwitch.setChecked(QuuppaTag.isBackgroundMode(this));
+        backgroundModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                if (Build.VERSION.SDK_INT >= 31) {
+                    AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                    if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Permission needed for Background Mode")
+                                .setMessage("Background mode requires permission to schedule exact alarms for reliable operation and to conserve battery. Please grant this permission in the next screen.")
+                                .setPositiveButton("OK", (dialog, which) -> {
+                                    awaitingAlarmPermissionResult = true;
+                                    Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(intent);
+                                })
+                                .setOnCancelListener(dialog -> backgroundModeSwitch.setChecked(false))
+                                .show();
+                        backgroundModeSwitch.setChecked(false);
+                        return;
+                    }
+                }
+            }
+            QuuppaTag.setBackgroundMode(this, isChecked);
+            restartServiceIfEnabled();
+        });
 
         if (QuuppaTag.getNotifiedActivityClass(this) == null)
             QuuppaTag.setNotifiedActivityClass(this, getClass());
@@ -133,6 +163,18 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     @Override
     protected void onResume() {
         super.onResume();
+        if (awaitingAlarmPermissionResult) {
+            awaitingAlarmPermissionResult = false;
+            if (Build.VERSION.SDK_INT >= 31) {
+                AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                if (alarmManager != null && alarmManager.canScheduleExactAlarms()) {
+                    backgroundModeSwitch.setChecked(true);
+                    QuuppaTag.setBackgroundMode(this, true);
+                    restartServiceIfEnabled();
+                }
+            }
+        }
+
         IntentFilter filter = new IntentFilter();
         for (IntentAction action : IntentAction.values()) {
             filter.addAction(action.fullyQualifiedName());
@@ -554,28 +596,6 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
             return false;
-        }
-
-        if (Build.VERSION.SDK_INT >= 31) {
-            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Permission needed to schedule alarms")
-                        .setMessage("The app relies on the accelerometer to know when the device is moving. "
-                                + "Inversely, the app needs to schedule a timed event (alarm) to set state back to stationary "
-                                + "and to slow the rate of advertisements. This reduces battery consumption.")
-                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                // Prompt user to grant the schedule exact alarm
-                                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
-                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                startActivity(intent);
-                            }
-                        })
-                        .show();
-                return false;
-            }
         }
 
         if (Build.VERSION.SDK_INT >= 31) // Build.VERSION_CODES.SNOW_CONE

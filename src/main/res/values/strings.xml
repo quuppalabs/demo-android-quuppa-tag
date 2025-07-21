@@ -7,4 +7,7 @@
     <string name="action_setAdvMode">Set advertisement mode (TX rate)</string>
     <string name="action_setAdvTxPower">Set advertisement TX power</string>
     <string name="action_showAbout">About this app</string>
+    <string name="background_mode_title">BACKGROUND MODE</string>
+    <string name="background_mode_description">Tag is active even when the app is in the background</string>
+    <string name="background_mode_switch">Background mode</string>
 </resources>
