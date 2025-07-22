@@ -50,9 +50,13 @@ android {
         }
     }
 
-    namespace 'com.quuppa.quuppatag'
+    buildFeatures {
+        buildConfig = true
+    }
+
+    namespace = 'com.quuppa.quuppatag'
     lint {
-        abortOnError false
+        abortOnError = false
     }
 }
 

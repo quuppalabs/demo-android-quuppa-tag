@@ -10,4 +10,7 @@
     <string name="background_mode_title">BACKGROUND MODE</string>
     <string name="background_mode_description">Tag is active even when the app is in the background</string>
     <string name="background_mode_switch">Background mode</string>
+    <string name="action_reset">Reset to defaults</string>
+    <string name="foreground_mode_title">FOREGROUND MODE</string>
+    <string name="foreground_mode_description">Tag is only guaranteed to be active when the app is in the foreground</string>
 </resources>

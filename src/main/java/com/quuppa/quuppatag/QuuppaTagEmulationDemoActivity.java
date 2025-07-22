@@ -45,7 +45,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 
 public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnClickListener {
@@ -57,10 +56,12 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
     private static final int NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE = 5;
 
     private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 6;
+    private static final String PREFS_IGNORE_BATTERY_OPTIMIZATION_ASKED = "IGNORE_BATTERY_OPTIMIZATION_ASKED";
 
     /** reference to the custom UI view that renders the pulsing Q */
     private PulsingQView pulsingView;
     private Switch backgroundModeSwitch;
+    private TextView operationModeDescription;
     private boolean awaitingAlarmPermissionResult = false;
 
     private BroadcastReceiver serviceBroadcastReceiver = new BroadcastReceiver() {
@@ -126,9 +127,13 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         setActionBar(findViewById(R.id.toolbar));
         pulsingView = (PulsingQView) findViewById(R.id.pulsingQView);
         backgroundModeSwitch = findViewById(R.id.background_mode_switch);
+        operationModeDescription = findViewById(R.id.operation_mode_description);
 
         pulsingView.setOnClickListener(this);
-        backgroundModeSwitch.setChecked(QuuppaTag.isBackgroundMode(this));
+
+        // Use prefs directly, lib uses true as the default value
+        updateBackgroundModeUI(preferences.getBoolean(QuuppaTag.PREFS_BACKGROUND_MODE, false));
+
         backgroundModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 if (Build.VERSION.SDK_INT >= 31) {
@@ -151,6 +156,7 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 }
             }
             QuuppaTag.setBackgroundMode(this, isChecked);
+            updateBackgroundModeUI(isChecked);
             restartServiceIfEnabled();
         });
 
@@ -158,6 +164,11 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             QuuppaTag.setNotifiedActivityClass(this, getClass());
 
         pulsingView.setIsPulsing(QuuppaTag.isServiceEnabled(this));
+    }
+
+    private void updateBackgroundModeUI(boolean backgroundMode) {
+        backgroundModeSwitch.setChecked(backgroundMode);
+        operationModeDescription.setText(backgroundMode ? R.string.background_mode_description : R.string.foreground_mode_description);
     }
 
     @Override
@@ -168,8 +179,8 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
             if (Build.VERSION.SDK_INT >= 31) {
                 AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
                 if (alarmManager != null && alarmManager.canScheduleExactAlarms()) {
-                    backgroundModeSwitch.setChecked(true);
                     QuuppaTag.setBackgroundMode(this, true);
+                    updateBackgroundModeUI(true);
                     restartServiceIfEnabled();
                 }
             }
@@ -194,28 +205,6 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
 
     protected void onDestroy() {
         super.onDestroy();
-        // Check if battery optimization is enabled for this app
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        final String packageName = getPackageName();
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            // Show dialog to prompt user to disable battery optimization
-            new AlertDialog.Builder(this)
-                    .setTitle("Disable Battery Optimization")
-                    .setMessage("We noticed that battery optimizations are not ignored for this application. "
-                            + "This may result in the OS terminating the Quuppa tag service while the app is in "
-                            + " the background. Would you like to disable battery optimizations for this app?")
-                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            // Open settings to disable battery optimization
-                            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                            intent.setData(Uri.parse("package:" + packageName));
-                            startActivity(intent);
-                        }
-                    })
-                    .setNegativeButton("No", null)
-                    .show();
-        }
     }
 
     @Override
@@ -286,6 +275,14 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
                 return true;
             case R.id.menu_enable_only_when:
                 showEnableConditionsDialog();
+                return true;
+            case R.id.action_reset:
+                preferences.edit().clear().apply();
+                Toast.makeText(this, "Settings reset to defaults", Toast.LENGTH_SHORT).show();
+                // re-initialize the view with default settings
+                updateBackgroundModeUI(QuuppaTag.isBackgroundMode(this));
+                // restart the service to apply the default settings
+                restartServiceIfEnabled();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -607,6 +604,29 @@ public class QuuppaTagEmulationDemoActivity extends Activity implements View.OnC
         Intent tagServiceIntent = new Intent(this, QuuppaTagService.class);
         startForegroundService(tagServiceIntent);
         QuuppaTag.setServiceEnabled(this, true);
+
+        if (QuuppaTag.isBackgroundMode(this)) if (!preferences.getBoolean(PREFS_IGNORE_BATTERY_OPTIMIZATION_ASKED, false)) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            final String packageName = getPackageName();
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                // Show dialog to prompt user to disable battery optimization
+                new AlertDialog.Builder(this)
+                        .setTitle("Disable Battery Optimization")
+                        .setMessage("We noticed that battery optimizations are not ignored for this application. "
+                                + "This may result in the OS terminating the Quuppa tag service while the app is in "
+                                + " the background. Would you like to disable battery optimizations for this app?")
+                        .setPositiveButton("Yes", (dialog, which) -> {
+                            // Open settings to disable battery optimization
+                            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                            intent.setData(Uri.parse("package:" + packageName));
+                            startActivity(intent);
+                        })
+                        .setNegativeButton("No", (dialog, which) -> {
+                            preferences.edit().putBoolean(PREFS_IGNORE_BATTERY_OPTIMIZATION_ASKED, true).apply();
+                        })
+                        .show();
+            }
+        }
         return true;
     }
 

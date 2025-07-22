@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/rect"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:background="@android:color/black">
 
     <Toolbar
         android:id="@+id/toolbar"
@@ -31,30 +32,23 @@
             android:scaleType="fitCenter"/>
 
         <LinearLayout
+            android:id="@+id/operation_mode_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center_horizontal"
             android:padding="16dp"
-            android:layout_marginBottom="32dp">
+            android:layout_marginBottom="16dp">
 
             <TextView
-                android:id="@+id/background_mode_title"
+                android:id="@+id/operation_mode_description"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/background_mode_title"
-                android:textAppearance="?android:attr/textAppearanceLarge"
-                android:textColor="@android:color/white"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/background_mode_description"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:minHeight="40dp"
                 android:text="@string/background_mode_description"
                 android:gravity="center"
                 android:textColor="@android:color/white"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="8dp"/>
 
             <Switch
                 android:id="@+id/background_mode_switch"
